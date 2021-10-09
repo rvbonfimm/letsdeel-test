@@ -3,6 +3,9 @@ const { Op } = require("sequelize");
 
 const { getProfile } = require("./middleware/getProfile");
 
+// TODO general refactor - Create generic function for check user profile
+// TODO general refactor - Create generic function for query filters
+
 /**
  * It should return the contract only if it belongs to the profile calling
  * @returns contract by id
@@ -104,6 +107,7 @@ router.get("/jobs/unpaid", getProfile, async (req, res) => {
   res.json(desiredJobs);
 });
 
+// TODO limit user authenticated to the user contract
 // TODO improve find+update operation to use only one
 /**
  * Pay for a job (Client to contractor)
