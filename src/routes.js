@@ -199,4 +199,109 @@ router.post("/jobs/:id/pay", getProfile, async (req, res) => {
   }
 });
 
+/**
+ * Deposits money into the balance of a client.
+ * A client can't deposit more than 25% his total of jobs to pay.
+ */
+router.post("/balances/deposit/:user_id", getProfile, async (req, res) => {
+  const { Profile, Job, Contract } = req.app.get("models");
+  const sequelize = req.app.get("sequelize");
+  const { user_id: userId } = req.params;
+
+  if (!req.body.amount) {
+    return res.status(400).json({
+      error: "Amount not provided to the deposit",
+    });
+  }
+
+  const { amount } = req.body;
+
+  const profile = req.profile;
+  const profileType = profile.type;
+  if (profileType !== "client") {
+    return res.json({
+      error: "Profile type not allowed to manage a Job Contract",
+    });
+  }
+
+  let profileJobs = [];
+  const jobs = await Job.findAll({
+    where: {
+      paid: null,
+    },
+  });
+  for await (const job of jobs) {
+    const contractId = job.ContractId;
+
+    const contract = await Contract.findOne({ where: { id: contractId } });
+    if (!contract) continue;
+
+    if (contract.ClientId === profile.id) profileJobs.push(job);
+  }
+
+  let paymentAmount = null;
+  if (profileJobs.length === 0) paymentAmount = 0;
+
+  const initialValue = 0;
+  paymentAmount = profileJobs.reduce(
+    (acc, actual) => acc + actual.price,
+    initialValue
+  );
+
+  const limitPermittedToDeposit = (paymentAmount * 25) / 100;
+
+  /** Check for deposit limit */
+  if (amount > limitPermittedToDeposit) {
+    const formatter = Intl.NumberFormat("pt-br", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return res.json({
+      error: `Limit exceeded to be deposited - ${
+        profileJobs.length
+      } pending jobs (Amount: ${formatter.format(
+        paymentAmount
+      )} / Limit: ${formatter.format(limitPermittedToDeposit)})`,
+    });
+  }
+
+  const userProfile = await Profile.findOne({ where: { id: userId } });
+  if (!userProfile) {
+    return res.json({
+      error: "User Profile not found to the deposit",
+    });
+  }
+
+  /** Clients pays for Jobs to Contractors */
+  if (userProfile.type !== "client") {
+    return res.json({
+      error: "Profile type to the deposit not allowed to manage a Job Contract",
+    });
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    /** Withdraw from authenticated profile */
+    const profileBalance = profile.balance - amount;
+    await Profile.update(
+      { balance: profileBalance },
+      { where: { id: profile.id } },
+      { transaction }
+    );
+
+    /** Deposit to the User Profile provided */
+    const userBalance = userProfile.balance + amount;
+    await Profile.update(
+      { balance: userBalance },
+      { where: { id: userProfile.id } },
+      { transaction }
+    );
+
+    return res.json({ message: "Deposit finished successfully" });
+  } catch (error) {
+    transaction.rollback();
+    return res.json({ error });
+  }
+});
+
 module.exports = router;
