@@ -174,6 +174,15 @@ router.post("/jobs/:id/pay", getProfile, async (req, res) => {
       { where: { id: contractorId } }
     );
 
+    /** Update current Job as paid */
+    await Job.update(
+      { 
+      paid: 1,
+      paymentDate: new Date()
+      },
+      { where: { id: jobId } }
+    )
+
     return res.json({ status: "success" });
   } catch (error) {
     await transaction.rollback();
