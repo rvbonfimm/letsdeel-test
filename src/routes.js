@@ -125,31 +125,40 @@ router.post("/jobs/:id/pay", getProfile, async (req, res) => {
   if (!job) return res.status(404).end();
 
   /** Check for job already opened */
-  if (job.paid !== null) return res.json("Job already paid");
+  if (job.paid !== null) return res.json({ error: "Job already paid" });
 
   /** Get the contract associated with the Current Authenticated Profile + Job Contract Id */
   const contract = await Contract.findOne({ where: { id: job.ContractId } });
   if (!contract) {
-    return res
-      .status(404)
-      .json({
-        error: "Job Contract not found",
-      })
-      .end();
+    return res.status(404).json({
+      error: "Job Contract not found",
+    });
   }
 
   /** Check for contract status */
-  if (contract.status === "terminated") return res.json("Contract already finished")
-  
+  if (contract.status === "terminated") {
+    return res.json({ error: "Contract already finished" });
+  }
+
   /** Check for the authenticated user profile */
   const profile = req.profile;
-  if (profile.type !== 'client') return res.json("Profile type not allowed to manage a Job Contract")
+  if (profile.type !== "client") {
+    return res.json({
+      error: "Profile type not allowed to manage a Job Contract",
+    });
+  }
 
-  if (contract.ClientId !== profile.id) return res.json("Profile not allowed to manage a Job Contract")
+  if (contract.ClientId !== profile.id) {
+    return res.json({
+      error: "Profile not allowed to manage a Job Contract",
+    });
+  }
 
   /** Check for client balance to the payment */
   if (profile.balance < job.price) {
-    return res.json("You do not have sufficient money to pay the job");
+    return res.json({
+      error: "You do not have sufficient money to pay the job",
+    });
   }
 
   const clientId = contract.ClientId;
@@ -176,14 +185,14 @@ router.post("/jobs/:id/pay", getProfile, async (req, res) => {
 
     /** Update current Job as paid */
     await Job.update(
-      { 
-      paid: 1,
-      paymentDate: new Date()
+      {
+        paid: 1,
+        paymentDate: new Date(),
       },
       { where: { id: jobId } }
-    )
+    );
 
-    return res.json({ status: "success" });
+    return res.json({ status: "Job paid successfully" });
   } catch (error) {
     await transaction.rollback();
     return res.json({ error });
