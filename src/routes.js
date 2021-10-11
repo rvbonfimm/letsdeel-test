@@ -5,11 +5,8 @@ const { getProfile } = require("./middleware/getProfile");
 
 // TODO general refactor - Create generic function for check user profile
 // TODO general refactor - Create generic function for query filters
+// TODO separate services from route/controller flow
 
-/**
- * It should return the contract only if it belongs to the profile calling
- * @returns contract by id
- */
 router.get("/contracts/:id", getProfile, async (req, res) => {
   const { Contract } = req.app.get("models");
   const { id } = req.params;
@@ -31,11 +28,6 @@ router.get("/contracts/:id", getProfile, async (req, res) => {
   res.json(contract);
 });
 
-/**
- * Returns a list of contracts belonging to a user (client or contractor).
- * The list should only contain non terminated contracts.
- * @returns contracts
- */
 router.get("/contracts", getProfile, async (req, res) => {
   const { Contract } = req.app.get("models");
 
@@ -60,11 +52,6 @@ router.get("/contracts", getProfile, async (req, res) => {
   res.json(contracts);
 });
 
-/**
- * Get all unpaid jobs for a user (either a client or contractor).
- * For active contracts only.
- * @returns jobs
- */
 router.get("/jobs/unpaid", getProfile, async (req, res) => {
   const { Contract, Job } = req.app.get("models");
 
@@ -107,14 +94,7 @@ router.get("/jobs/unpaid", getProfile, async (req, res) => {
   res.json(desiredJobs);
 });
 
-// TODO limit user authenticated to the user contract
 // TODO improve find+update operation to use only one
-/**
- * Pay for a job (Client to contractor)
- * A client can only pay if his balance >= the amount to pay
- * The amount should be moved from the client's balance to the contractor balance
- * @returns operation status
- */
 router.post("/jobs/:id/pay", getProfile, async (req, res) => {
   const { Job, Contract, Profile } = req.app.get("models");
   const sequelize = req.app.get("sequelize");
@@ -199,10 +179,7 @@ router.post("/jobs/:id/pay", getProfile, async (req, res) => {
   }
 });
 
-/**
- * Deposits money into the balance of a client.
- * A client can't deposit more than 25% his total of jobs to pay.
- */
+// TODO improve find+update operation to use only one
 router.post("/balances/deposit/:user_id", getProfile, async (req, res) => {
   const { Profile, Job, Contract } = req.app.get("models");
   const sequelize = req.app.get("sequelize");
