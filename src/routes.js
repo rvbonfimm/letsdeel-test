@@ -115,32 +115,41 @@ router.get("/jobs/unpaid", getProfile, async (req, res) => {
  * The amount should be moved from the client's balance to the contractor balance
  * @returns operation status
  */
-router.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
+router.post("/jobs/:id/pay", getProfile, async (req, res) => {
   const { Job, Contract, Profile } = req.app.get("models");
   const sequelize = req.app.get("sequelize");
   const { id } = req.params;
 
-  const job = await Job.findOne({ where: id });
+  const jobId = parseInt(id);
+  const job = await Job.findOne({ where: { id: jobId } });
   if (!job) return res.status(404).end();
 
   /** Check for job already opened */
   if (job.paid !== null) return res.json("Job already paid");
 
-  /** Check for client balance */
-  const profile = req.profile;
-  if (profile.balance < job.price) {
-    return res.json("You do not have sufficient money to pay the job");
-  }
-
-  /** Send profile money to the job contractor */
+  /** Get the contract associated with the Current Authenticated Profile + Job Contract Id */
   const contract = await Contract.findOne({ where: { id: job.ContractId } });
   if (!contract) {
     return res
       .status(404)
       .json({
-        error: "Contract for the payment not found",
+        error: "Job Contract not found",
       })
       .end();
+  }
+
+  /** Check for contract status */
+  if (contract.status === "terminated") return res.json("Contract already finished")
+  
+  /** Check for the authenticated user profile */
+  const profile = req.profile;
+  if (profile.type !== 'client') return res.json("Profile type not allowed to manage a Job Contract")
+
+  if (contract.ClientId !== profile.id) return res.json("Profile not allowed to manage a Job Contract")
+
+  /** Check for client balance to the payment */
+  if (profile.balance < job.price) {
+    return res.json("You do not have sufficient money to pay the job");
   }
 
   const clientId = contract.ClientId;
